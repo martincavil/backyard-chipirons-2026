@@ -1,10 +1,10 @@
 'use client';
 
 import { useRaceState } from '@/hooks/useRaceState';
-import { AdminView } from '@/components/AdminView';
+import { DashboardView } from '@/components/DashboardView';
 
-export default function Home() {
-  const { state, setState, loaded } = useRaceState();
+export default function DashboardPage() {
+  const { state, loaded } = useRaceState();
 
   if (!loaded) {
     return (
@@ -25,5 +25,5 @@ export default function Home() {
     );
   }
 
-  return <AdminView state={state} setState={setState} />;
+  return <DashboardView state={state} />;
 }
