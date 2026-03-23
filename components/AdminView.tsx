@@ -5,6 +5,10 @@ import { RaceState, EliminationReason } from '@/types';
 import { computeLoopInfo, formatTime, getParisNow } from '@/lib/utils';
 import { DEFAULT_STATE, MAX_LOOP_DURATION_MS } from '@/lib/constants';
 import { PhotoUpload } from './PhotoUpload';
+import { useUndoAction } from '@/hooks/useUndoAction';
+import { UndoToast } from './UndoToast';
+import { Soundboard } from './Soundboard';
+import { SoundType } from '@/lib/sounds';
 
 interface AdminViewProps {
   state: RaceState;
@@ -15,6 +19,9 @@ export function AdminView({ state, setState }: AdminViewProps) {
   const [newName, setNewName] = useState('');
   const [newPhoto, setNewPhoto] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
+
+  const { undoActions, addUndoAction, undoAction, dismissAction } =
+    useUndoAction(state, setState);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
@@ -73,6 +80,11 @@ export function AdminView({ state, setState }: AdminViewProps) {
   };
 
   const recordArrival = (runnerId: string) => {
+    const runner = state.runners.find((r) => r.id === runnerId);
+    if (!runner) return;
+
+    const previousState = { ...state };
+
     const paris = getParisNow();
     const loopInfo = computeLoopInfo(state.raceStartTime);
     const raceStart = new Date(state.raceStartTime!);
@@ -97,13 +109,26 @@ export function AdminView({ state, setState }: AdminViewProps) {
         ],
       };
     });
-    setState({ ...state, runners: newRunners });
+
+    const newState = {
+      ...state,
+      runners: newRunners,
+      lastArrival: { runnerId, _ts: Date.now() },
+    };
+
+    setState(newState);
+    addUndoAction(
+      `Arrivée enregistrée pour ${runner.name}`,
+      previousState,
+    );
   };
 
   const eliminateRunner = (runnerId: string, reason: EliminationReason = 'timeout') => {
+    const elimName = state.runners.find((r) => r.id === runnerId)?.name || '?';
+    const previousState = { ...state };
+
     const paris = getParisNow();
     const loopInfo = computeLoopInfo(state.raceStartTime);
-    const elimName = state.runners.find((r) => r.id === runnerId)?.name || '?';
     const newRunners = state.runners.map((r) => {
       if (r.id !== runnerId) return r;
       return {
@@ -116,19 +141,33 @@ export function AdminView({ state, setState }: AdminViewProps) {
         },
       };
     });
-    setState({
+
+    const newState = {
       ...state,
       runners: newRunners,
       lastElimination: { name: elimName, _ts: Date.now() },
-    });
+    };
+
+    setState(newState);
+    addUndoAction(
+      `${elimName} éliminé(e) (${reason === 'timeout' ? 'Hors délai' : 'Abandon'})`,
+      previousState,
+    );
   };
 
   const declareWinner = (runnerId: string) => {
+    const winnerName = state.runners.find((r) => r.id === runnerId)?.name || '?';
+    const previousState = { ...state };
+
     const newRunners = state.runners.map((r) => {
       if (r.id !== runnerId) return r;
       return { ...r, status: 'winner' as const };
     });
-    setState({ ...state, runners: newRunners, raceFinished: true });
+
+    const newState = { ...state, runners: newRunners, raceFinished: true };
+
+    setState(newState);
+    addUndoAction(`${winnerName} déclaré(e) vainqueur`, previousState);
   };
 
   const resetRace = () => {
@@ -140,6 +179,13 @@ export function AdminView({ state, setState }: AdminViewProps) {
       const fresh = { ...DEFAULT_STATE };
       setState(fresh);
     }
+  };
+
+  const playSoundOnDashboard = (sound: SoundType) => {
+    setState({
+      ...state,
+      soundToPlay: { sound, _ts: Date.now() },
+    });
   };
 
   const parisTimeStr = getParisNow().toLocaleTimeString('fr-FR', {
@@ -696,6 +742,11 @@ export function AdminView({ state, setState }: AdminViewProps) {
           </div>
         )}
 
+        {/* Soundboard */}
+        {state.raceStarted && (
+          <Soundboard onPlaySound={playSoundOnDashboard} />
+        )}
+
         {/* Instructions */}
         <div
           style={{
@@ -714,6 +765,13 @@ export function AdminView({ state, setState }: AdminViewProps) {
           Cet onglet est l&apos;admin. Les deux se synchronisent automatiquement.
         </div>
       </div>
+
+      {/* Undo toasts */}
+      <UndoToast
+        actions={undoActions}
+        onUndo={undoAction}
+        onDismiss={dismissAction}
+      />
     </div>
   );
 }

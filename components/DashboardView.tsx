@@ -9,6 +9,10 @@ import { CorralTimer } from './CorralTimer';
 import { RunnerRow } from './RunnerRow';
 import { DeathBoard } from './DeathBoard';
 import { WastedOverlay } from './WastedOverlay';
+import WeatherWidget from './WeatherWidget';
+import { LiveStatsFooter } from './LiveStatsFooter';
+import { playSound } from '@/lib/sounds';
+import { DuelMode } from './DuelMode';
 
 interface DashboardViewProps {
   state: RaceState;
@@ -18,6 +22,8 @@ export function DashboardView({ state }: DashboardViewProps) {
   const [now, setNow] = useState(Date.now());
   const [wastedRunner, setWastedRunner] = useState<string | null>(null);
   const lastEliminationRef = useRef<number | null>(null);
+  const lastSoundRef = useRef<number | null>(null);
+  const bossSoundPlayedRef = useRef(false);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 200);
@@ -36,12 +42,43 @@ export function DashboardView({ state }: DashboardViewProps) {
     }
   }, [state.lastElimination]);
 
+  // Detect soundboard triggers and play sounds
+  useEffect(() => {
+    if (
+      state.soundToPlay &&
+      state.soundToPlay._ts !== lastSoundRef.current
+    ) {
+      lastSoundRef.current = state.soundToPlay._ts;
+      playSound(state.soundToPlay.sound);
+    }
+  }, [state.soundToPlay]);
+
   const { currentLoop, msRemaining, preRace } = computeLoopInfo(
     state.raceStartTime,
   );
   const activeRunners = state.runners.filter((r) => r.status === 'active');
   const eliminatedRunners = state.runners.filter((r) => r.status === 'dnf');
   const winner = state.runners.find((r) => r.status === 'winner');
+
+  // Detect duel mode (exactly 2 active runners)
+  const isDuelMode = activeRunners.length === 2;
+
+  // Play boss fight sound when entering duel mode (only once)
+  useEffect(() => {
+    if (isDuelMode && !bossSoundPlayedRef.current) {
+      bossSoundPlayedRef.current = true;
+      playSound('boss');
+    }
+    // Reset when more than 2 runners (shouldn't happen but just in case)
+    if (activeRunners.length > 2) {
+      bossSoundPlayedRef.current = false;
+    }
+  }, [isDuelMode, activeRunners.length]);
+
+  // Calculate race elapsed time
+  const raceElapsedMs = state.raceStartTime
+    ? now - new Date(state.raceStartTime).getTime()
+    : 0;
 
   // Find fastest loop time among all runners (last completed loop)
   let fastestLoopRunnerId: string | null = null;
@@ -64,6 +101,58 @@ export function DashboardView({ state }: DashboardViewProps) {
     const bLast = b.loops[b.loops.length - 1]?.timeMs ?? Infinity;
     return aLast - bLast;
   });
+
+  // Duel mode: exactly 2 active runners
+  if (isDuelMode && !winner) {
+    return (
+      <div style={{ position: 'relative' }}>
+        {wastedRunner && (
+          <WastedOverlay
+            name={wastedRunner}
+            onDone={() => setWastedRunner(null)}
+          />
+        )}
+
+        <DuelMode runners={activeRunners as [any, any]} currentLoop={currentLoop} />
+
+        {/* Timer overlay */}
+        {state.raceStarted && (
+          <div
+            style={{
+              position: 'fixed',
+              top: 20,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 100,
+            }}
+          >
+            <CorralTimer
+              currentLoop={currentLoop}
+              msRemaining={msRemaining}
+              preRace={preRace}
+            />
+          </div>
+        )}
+
+        {/* Mini death board at bottom */}
+        {eliminatedRunners.length > 0 && (
+          <div
+            style={{
+              position: 'fixed',
+              bottom: 20,
+              right: 20,
+              maxWidth: 400,
+              zIndex: 100,
+              transform: 'scale(0.7)',
+              transformOrigin: 'bottom right',
+            }}
+          >
+            <DeathBoard eliminatedRunners={eliminatedRunners} />
+          </div>
+        )}
+      </div>
+    );
+  }
 
   if (winner) {
     return (
@@ -185,73 +274,82 @@ export function DashboardView({ state }: DashboardViewProps) {
         <div
           style={{
             display: 'flex',
-            gap: 30,
-            fontFamily: "'Oswald', sans-serif",
+            gap: 20,
+            alignItems: 'center',
           }}
         >
-          <div style={{ textAlign: 'center' }}>
-            <div
-              style={{
-                fontSize: 36,
-                color: '#00ff88',
-                fontFamily: "'Bebas Neue', sans-serif",
-              }}
-            >
-              {activeRunners.length}
+          <div
+            style={{
+              display: 'flex',
+              gap: 30,
+              fontFamily: "'Oswald', sans-serif",
+            }}
+          >
+            <div style={{ textAlign: 'center' }}>
+              <div
+                style={{
+                  fontSize: 36,
+                  color: '#00ff88',
+                  fontFamily: "'Bebas Neue', sans-serif",
+                }}
+              >
+                {activeRunners.length}
+              </div>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: '#666',
+                  letterSpacing: 2,
+                  textTransform: 'uppercase',
+                }}
+              >
+                En course
+              </div>
             </div>
-            <div
-              style={{
-                fontSize: 12,
-                color: '#666',
-                letterSpacing: 2,
-                textTransform: 'uppercase',
-              }}
-            >
-              En course
+            <div style={{ textAlign: 'center' }}>
+              <div
+                style={{
+                  fontSize: 36,
+                  color: '#cc0000',
+                  fontFamily: "'Bebas Neue', sans-serif",
+                }}
+              >
+                {eliminatedRunners.length}
+              </div>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: '#666',
+                  letterSpacing: 2,
+                  textTransform: 'uppercase',
+                }}
+              >
+                Éliminés
+              </div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div
+                style={{
+                  fontSize: 36,
+                  color: '#4488ff',
+                  fontFamily: "'Bebas Neue', sans-serif",
+                }}
+              >
+                {currentLoop || '—'}
+              </div>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: '#666',
+                  letterSpacing: 2,
+                  textTransform: 'uppercase',
+                }}
+              >
+                Boucle
+              </div>
             </div>
           </div>
-          <div style={{ textAlign: 'center' }}>
-            <div
-              style={{
-                fontSize: 36,
-                color: '#cc0000',
-                fontFamily: "'Bebas Neue', sans-serif",
-              }}
-            >
-              {eliminatedRunners.length}
-            </div>
-            <div
-              style={{
-                fontSize: 12,
-                color: '#666',
-                letterSpacing: 2,
-                textTransform: 'uppercase',
-              }}
-            >
-              Éliminés
-            </div>
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <div
-              style={{
-                fontSize: 36,
-                color: '#4488ff',
-                fontFamily: "'Bebas Neue', sans-serif",
-              }}
-            >
-              {currentLoop || '—'}
-            </div>
-            <div
-              style={{
-                fontSize: 12,
-                color: '#666',
-                letterSpacing: 2,
-                textTransform: 'uppercase',
-              }}
-            >
-              Boucle
-            </div>
-          </div>
+          <WeatherWidget />
         </div>
       </div>
 
@@ -302,6 +400,8 @@ export function DashboardView({ state }: DashboardViewProps) {
                 runner={r}
                 fastestLoopRunnerId={fastestLoopRunnerId}
                 currentLoop={currentLoop}
+                lastArrival={state.lastArrival}
+                msRemaining={msRemaining}
               />
             ))}
             {sortedActive.length === 0 && (
@@ -324,6 +424,11 @@ export function DashboardView({ state }: DashboardViewProps) {
         {/* Death board */}
         <DeathBoard eliminatedRunners={eliminatedRunners} />
       </div>
+
+      {/* Live stats footer */}
+      {state.raceStarted && (
+        <LiveStatsFooter state={state} raceElapsedMs={raceElapsedMs} />
+      )}
     </div>
   );
 }

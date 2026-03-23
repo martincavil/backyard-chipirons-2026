@@ -1,19 +1,46 @@
 'use client';
 
-import { Runner } from '@/types';
+import { useEffect, useRef, useState } from 'react';
+import { LastArrival, Runner } from '@/types';
 import { formatTime } from '@/lib/utils';
+import { CelebrationEffect } from './CelebrationEffect';
+import { ProgressRing } from './ProgressRing';
+import { MAX_LOOP_DURATION_MS } from '@/lib/constants';
 
 interface RunnerRowProps {
   runner: Runner;
   fastestLoopRunnerId: string | null;
   currentLoop: number;
+  lastArrival: LastArrival | null;
+  msRemaining: number;
 }
 
-export function RunnerRow({ runner, fastestLoopRunnerId, currentLoop }: RunnerRowProps) {
+export function RunnerRow({ runner, fastestLoopRunnerId, currentLoop, lastArrival, msRemaining }: RunnerRowProps) {
+  const [showCelebration, setShowCelebration] = useState(false);
+  const lastArrivalRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (
+      lastArrival &&
+      lastArrival.runnerId === runner.id &&
+      lastArrival._ts !== lastArrivalRef.current
+    ) {
+      lastArrivalRef.current = lastArrival._ts;
+      setShowCelebration(true);
+      const timer = setTimeout(() => setShowCelebration(false), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [lastArrival, runner.id]);
+
   const lastLoop = runner.loops?.[runner.loops.length - 1];
   const isFastest = runner.id === fastestLoopRunnerId;
-  const completedCurrent =
-    lastLoop?.loop === (currentLoop > 0 ? currentLoop - 1 : 0);
+
+  // Check if runner has completed current loop
+  const completedCurrentLoop = lastLoop?.loop === currentLoop;
+
+  // Calculate progress in current loop (0-1)
+  const msElapsed = MAX_LOOP_DURATION_MS - msRemaining;
+  const progress = Math.min(1, Math.max(0, msElapsed / MAX_LOOP_DURATION_MS));
 
   return (
     <div
@@ -30,40 +57,50 @@ export function RunnerRow({ runner, fastestLoopRunnerId, currentLoop }: RunnerRo
           ? '1px solid rgba(255,215,0,0.3)'
           : '1px solid rgba(255,255,255,0.05)',
         position: 'relative',
+        overflow: 'hidden',
       }}
     >
-      <div
-        style={{
-          width: 42,
-          height: 42,
-          borderRadius: '50%',
-          overflow: 'hidden',
-          border: isFastest ? '2px solid gold' : '2px solid #333',
-          flexShrink: 0,
-          background: '#1a1a2e',
-        }}
-      >
-        {runner.photo ? (
-          <img
-            src={runner.photo}
-            alt=""
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-          />
-        ) : (
+      {showCelebration && <CelebrationEffect runnerId={runner.id} />}
+      <div style={{ flexShrink: 0 }}>
+        <ProgressRing
+          progress={progress}
+          completed={completedCurrentLoop}
+          size={50}
+          strokeWidth={3}
+        >
           <div
             style={{
               width: '100%',
               height: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#555',
-              fontSize: 18,
+              borderRadius: '50%',
+              overflow: 'hidden',
+              border: isFastest ? '2px solid gold' : '2px solid #333',
+              background: '#1a1a2e',
             }}
           >
-            🏃
+            {runner.photo ? (
+              <img
+                src={runner.photo}
+                alt=""
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#555',
+                  fontSize: 18,
+                }}
+              >
+                🏃
+              </div>
+            )}
           </div>
-        )}
+        </ProgressRing>
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
