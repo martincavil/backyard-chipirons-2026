@@ -9,8 +9,20 @@ interface WastedOverlayProps {
 
 export function WastedOverlay({ name, onDone }: WastedOverlayProps) {
   useEffect(() => {
-    const timer = setTimeout(onDone, 4000);
-    return () => clearTimeout(timer);
+    const timer = setTimeout(onDone, 3000);
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onDone();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
   }, [onDone]);
 
   return (
