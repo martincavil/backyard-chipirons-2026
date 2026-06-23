@@ -9,7 +9,7 @@ interface WastedOverlayProps {
 
 export function WastedOverlay({ name, onDone }: WastedOverlayProps) {
   useEffect(() => {
-    const timer = setTimeout(onDone, 3000);
+    const timer = setTimeout(onDone, 1500);
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -46,7 +46,7 @@ export function WastedOverlay({ name, onDone }: WastedOverlayProps) {
             color: "#cc0000",
             textShadow: "0 0 60px rgba(255,0,0,0.6), 0 4px 0 #440000",
             letterSpacing: "12px",
-            animation: "wastedZoom 0.5s cubic-bezier(0.2, 0, 0.2, 1)",
+            animation: "wastedZoom 0.3s cubic-bezier(0.2, 0, 0.2, 1)",
             filter: "grayscale(30%)",
           }}
         >

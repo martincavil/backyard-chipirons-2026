@@ -6,6 +6,11 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  background: #050a14;
+}
+
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }

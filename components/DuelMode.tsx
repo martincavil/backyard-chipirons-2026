@@ -6,10 +6,15 @@ import { formatTime } from '@/lib/utils';
 interface DuelModeProps {
   runners: [Runner, Runner];
   currentLoop: number;
+  msRemaining: number;
+  preRace?: boolean;
 }
 
-export function DuelMode({ runners, currentLoop }: DuelModeProps) {
+export function DuelMode({ runners, currentLoop, msRemaining, preRace }: DuelModeProps) {
   const [runner1, runner2] = runners;
+  const urgent = msRemaining < 5 * 60 * 1000;
+  const critical = msRemaining < 60 * 1000;
+  const flash = critical && Math.floor(Date.now() / 500) % 2 === 0;
 
   const getBestTime = (runner: Runner) => {
     if (runner.loops.length === 0) return null;
@@ -76,8 +81,33 @@ export function DuelMode({ runners, currentLoop }: DuelModeProps) {
             textTransform: 'uppercase',
           }}
         >
-          Last (Wo)Man Standing — Boucle {currentLoop}
+          Last (Wo)Man Standing — {preRace ? 'Départ dans' : `Boucle ${currentLoop}`}
         </div>
+        {!preRace && (
+          <div
+            style={{
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 'clamp(48px, 9vw, 90px)',
+              fontWeight: 400,
+              marginTop: 6,
+              lineHeight: 1,
+              color: critical
+                ? flash
+                  ? '#ff0000'
+                  : '#660000'
+                : urgent
+                  ? '#ff4444'
+                  : '#00ff88',
+              textShadow: critical
+                ? '0 0 30px rgba(255,0,0,0.7)'
+                : urgent
+                  ? '0 0 24px rgba(255,68,68,0.5)'
+                  : '0 0 24px rgba(0,255,136,0.3)',
+            }}
+          >
+            {formatTime(msRemaining)}
+          </div>
+        )}
       </div>
 
       {/* Duel Arena */}

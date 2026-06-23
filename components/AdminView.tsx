@@ -1,14 +1,19 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { RaceState, EliminationReason } from '@/types';
-import { computeLoopInfo, formatTime, getParisNow } from '@/lib/utils';
-import { DEFAULT_STATE, MAX_LOOP_DURATION_MS } from '@/lib/constants';
-import { PhotoUpload } from './PhotoUpload';
-import { useUndoAction } from '@/hooks/useUndoAction';
-import { UndoToast } from './UndoToast';
-import { Soundboard } from './Soundboard';
-import { SoundType } from '@/lib/sounds';
+import { useState, useEffect } from "react";
+import { RaceState, EliminationReason } from "@/types";
+import { computeLoopInfo, formatTime, getParisNow } from "@/lib/utils";
+import {
+  DEFAULT_STATE,
+  MAX_LOOP_DURATION_MS,
+  FIRST_START_HOUR,
+  MAX_LOOPS,
+} from "@/lib/constants";
+import { PhotoUpload } from "./PhotoUpload";
+import { useUndoAction } from "@/hooks/useUndoAction";
+import { UndoToast } from "./UndoToast";
+import { Soundboard } from "./Soundboard";
+import { SoundType } from "@/lib/sounds";
 
 interface AdminViewProps {
   state: RaceState;
@@ -16,7 +21,7 @@ interface AdminViewProps {
 }
 
 export function AdminView({ state, setState }: AdminViewProps) {
-  const [newName, setNewName] = useState('');
+  const [newName, setNewName] = useState("");
   const [newPhoto, setNewPhoto] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
 
@@ -31,8 +36,8 @@ export function AdminView({ state, setState }: AdminViewProps) {
   const { currentLoop, msRemaining, preRace } = computeLoopInfo(
     state.raceStartTime,
   );
-  const activeRunners = state.runners.filter((r) => r.status === 'active');
-  const eliminatedRunners = state.runners.filter((r) => r.status === 'dnf');
+  const activeRunners = state.runners.filter((r) => r.status === "active");
+  const eliminatedRunners = state.runners.filter((r) => r.status === "dnf");
 
   const addRunner = () => {
     if (!newName.trim()) return;
@@ -40,12 +45,12 @@ export function AdminView({ state, setState }: AdminViewProps) {
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
       name: newName.trim(),
       photo: newPhoto,
-      status: 'active' as const,
+      status: "active" as const,
       loops: [],
       eliminatedAt: null,
     };
     setState({ ...state, runners: [...state.runners, runner] });
-    setNewName('');
+    setNewName("");
     setNewPhoto(null);
   };
 
@@ -55,11 +60,18 @@ export function AdminView({ state, setState }: AdminViewProps) {
     }
   };
 
+  const updateRunnerPhoto = (id: string, photo: string) => {
+    setState({
+      ...state,
+      runners: state.runners.map((r) => (r.id === id ? { ...r, photo } : r)),
+    });
+  };
+
   const startRace = () => {
-    // Set race start to the next noon Paris time (or now if it IS noon)
+    // Set race start to the official first start time (10h00 pile)
     const paris = getParisNow();
     const startTime = new Date(paris);
-    startTime.setHours(12, 0, 0, 0);
+    startTime.setHours(FIRST_START_HOUR, 0, 0, 0);
     setState({
       ...state,
       raceStarted: true,
@@ -117,14 +129,14 @@ export function AdminView({ state, setState }: AdminViewProps) {
     };
 
     setState(newState);
-    addUndoAction(
-      `Arrivée enregistrée pour ${runner.name}`,
-      previousState,
-    );
+    addUndoAction(`Arrivée enregistrée pour ${runner.name}`, previousState);
   };
 
-  const eliminateRunner = (runnerId: string, reason: EliminationReason = 'timeout') => {
-    const elimName = state.runners.find((r) => r.id === runnerId)?.name || '?';
+  const eliminateRunner = (
+    runnerId: string,
+    reason: EliminationReason = "timeout",
+  ) => {
+    const elimName = state.runners.find((r) => r.id === runnerId)?.name || "?";
     const previousState = { ...state };
 
     const paris = getParisNow();
@@ -133,7 +145,7 @@ export function AdminView({ state, setState }: AdminViewProps) {
       if (r.id !== runnerId) return r;
       return {
         ...r,
-        status: 'dnf' as const,
+        status: "dnf" as const,
         eliminatedAt: {
           loop: loopInfo.currentLoop,
           time: paris.toISOString(),
@@ -150,18 +162,19 @@ export function AdminView({ state, setState }: AdminViewProps) {
 
     setState(newState);
     addUndoAction(
-      `${elimName} éliminé(e) (${reason === 'timeout' ? 'Hors délai' : 'Abandon'})`,
+      `${elimName} éliminé(e) (${reason === "timeout" ? "Hors délai" : "Abandon"})`,
       previousState,
     );
   };
 
   const declareWinner = (runnerId: string) => {
-    const winnerName = state.runners.find((r) => r.id === runnerId)?.name || '?';
+    const winnerName =
+      state.runners.find((r) => r.id === runnerId)?.name || "?";
     const previousState = { ...state };
 
     const newRunners = state.runners.map((r) => {
       if (r.id !== runnerId) return r;
-      return { ...r, status: 'winner' as const };
+      return { ...r, status: "winner" as const };
     });
 
     const newState = { ...state, runners: newRunners, raceFinished: true };
@@ -173,7 +186,7 @@ export function AdminView({ state, setState }: AdminViewProps) {
   const resetRace = () => {
     if (
       window.confirm(
-        '⚠️ Remettre à zéro toute la course ? Cette action est irréversible.',
+        "⚠️ Remettre à zéro toute la course ? Cette action est irréversible.",
       )
     ) {
       const fresh = { ...DEFAULT_STATE };
@@ -188,31 +201,31 @@ export function AdminView({ state, setState }: AdminViewProps) {
     });
   };
 
-  const parisTimeStr = getParisNow().toLocaleTimeString('fr-FR', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
+  const parisTimeStr = getParisNow().toLocaleTimeString("fr-FR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
   });
 
   return (
     <div
       style={{
-        minHeight: '100vh',
-        background: '#0f0f1a',
-        color: '#ddd',
+        minHeight: "100vh",
+        background: "#0f0f1a",
+        color: "#ddd",
         fontFamily: "'Oswald', sans-serif",
         padding: 20,
       }}
     >
-      <div style={{ maxWidth: 800, margin: '0 auto' }}>
+      <div style={{ maxWidth: 800, margin: "0 auto" }}>
         {/* Header */}
         <div
           style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
             marginBottom: 24,
-            borderBottom: '1px solid #222',
+            borderBottom: "1px solid #222",
             paddingBottom: 16,
           }}
         >
@@ -226,24 +239,24 @@ export function AdminView({ state, setState }: AdminViewProps) {
             >
               🦑 Admin — Chipirons 2026
             </div>
-            <div style={{ fontSize: 13, color: '#666' }}>
+            <div style={{ fontSize: 13, color: "#666" }}>
               Heure Paris : {parisTimeStr}
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            <span style={{ fontSize: 14, color: '#555' }}>
-              {activeRunners.length} en course · {eliminatedRunners.length}{' '}
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <span style={{ fontSize: 14, color: "#555" }}>
+              {activeRunners.length} en course · {eliminatedRunners.length}{" "}
               éliminés
             </span>
             <button
               onClick={resetRace}
               style={{
-                background: '#331111',
-                color: '#aa4444',
-                border: '1px solid #442222',
+                background: "#331111",
+                color: "#aa4444",
+                border: "1px solid #442222",
                 borderRadius: 6,
-                padding: '6px 12px',
-                cursor: 'pointer',
+                padding: "6px 12px",
+                cursor: "pointer",
                 fontSize: 13,
               }}
             >
@@ -256,20 +269,20 @@ export function AdminView({ state, setState }: AdminViewProps) {
         {state.raceStarted && (
           <div
             style={{
-              background: 'rgba(0,255,136,0.05)',
-              border: '1px solid rgba(0,255,136,0.15)',
+              background: "rgba(0,255,136,0.05)",
+              border: "1px solid rgba(0,255,136,0.15)",
               borderRadius: 12,
               padding: 16,
               marginBottom: 20,
-              textAlign: 'center',
+              textAlign: "center",
             }}
           >
             <div
               style={{
                 fontSize: 14,
-                color: '#666',
+                color: "#666",
                 letterSpacing: 2,
-                textTransform: 'uppercase',
+                textTransform: "uppercase",
               }}
             >
               Boucle {currentLoop} — Temps restant
@@ -278,11 +291,24 @@ export function AdminView({ state, setState }: AdminViewProps) {
               style={{
                 fontFamily: "'Bebas Neue', sans-serif",
                 fontSize: 48,
-                color: msRemaining < 5 * 60 * 1000 ? '#ff4444' : '#00ff88',
+                color: msRemaining < 5 * 60 * 1000 ? "#ff4444" : "#00ff88",
               }}
             >
               {formatTime(msRemaining)}
             </div>
+            {currentLoop >= MAX_LOOPS && (
+              <div
+                style={{
+                  marginTop: 8,
+                  color: "#ff4444",
+                  fontFamily: "'Oswald', sans-serif",
+                  fontSize: 14,
+                  letterSpacing: 1,
+                }}
+              >
+                ⚠️ Dernière boucle possible — fin de course prévue à 20h00
+              </div>
+            )}
           </div>
         )}
 
@@ -291,8 +317,8 @@ export function AdminView({ state, setState }: AdminViewProps) {
           <>
             <div
               style={{
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid #222',
+                background: "rgba(255,255,255,0.03)",
+                border: "1px solid #222",
                 borderRadius: 12,
                 padding: 20,
                 marginBottom: 20,
@@ -301,7 +327,7 @@ export function AdminView({ state, setState }: AdminViewProps) {
               <div style={{ fontSize: 16, marginBottom: 16, fontWeight: 500 }}>
                 Ajouter un coureur
               </div>
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
                 <PhotoUpload
                   photo={newPhoto}
                   onChange={setNewPhoto}
@@ -312,27 +338,27 @@ export function AdminView({ state, setState }: AdminViewProps) {
                   placeholder="Prénom / Pseudo"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && addRunner()}
+                  onKeyDown={(e) => e.key === "Enter" && addRunner()}
                   style={{
                     flex: 1,
-                    background: '#1a1a2e',
-                    border: '1px solid #333',
+                    background: "#1a1a2e",
+                    border: "1px solid #333",
                     borderRadius: 8,
-                    padding: '10px 14px',
-                    color: '#eee',
+                    padding: "10px 14px",
+                    color: "#eee",
                     fontSize: 16,
-                    outline: 'none',
+                    outline: "none",
                   }}
                 />
                 <button
                   onClick={addRunner}
                   style={{
-                    background: '#00cc66',
-                    color: '#000',
-                    border: 'none',
+                    background: "#00cc66",
+                    color: "#000",
+                    border: "none",
                     borderRadius: 8,
-                    padding: '10px 20px',
-                    cursor: 'pointer',
+                    padding: "10px 20px",
+                    cursor: "pointer",
                     fontSize: 16,
                     fontWeight: 600,
                   }}
@@ -348,75 +374,44 @@ export function AdminView({ state, setState }: AdminViewProps) {
                 <div
                   style={{
                     fontSize: 14,
-                    color: '#555',
+                    color: "#555",
                     letterSpacing: 2,
                     marginBottom: 8,
-                    textTransform: 'uppercase',
+                    textTransform: "uppercase",
                   }}
                 >
                   {state.runners.length} coureur
-                  {state.runners.length > 1 ? 's' : ''} inscrits
+                  {state.runners.length > 1 ? "s" : ""} inscrits
                 </div>
                 {state.runners.map((r) => (
                   <div
                     key={r.id}
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
+                      display: "flex",
+                      alignItems: "center",
                       gap: 12,
-                      padding: '8px 12px',
+                      padding: "8px 12px",
                       borderRadius: 8,
                       marginBottom: 4,
-                      background: 'rgba(255,255,255,0.03)',
-                      border: '1px solid #1a1a2e',
+                      background: "rgba(255,255,255,0.03)",
+                      border: "1px solid #1a1a2e",
                     }}
                   >
-                    <div
-                      style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: '50%',
-                        overflow: 'hidden',
-                        border: '1px solid #333',
-                        flexShrink: 0,
-                        background: '#1a1a2e',
-                      }}
-                    >
-                      {r.photo ? (
-                        <img
-                          src={r.photo}
-                          alt=""
-                          style={{
-                            width: '100%',
-                            height: '100%',
-                            objectFit: 'cover',
-                          }}
-                        />
-                      ) : (
-                        <div
-                          style={{
-                            width: '100%',
-                            height: '100%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: '#555',
-                          }}
-                        >
-                          🏃
-                        </div>
-                      )}
-                    </div>
+                    <PhotoUpload
+                      photo={r.photo}
+                      onChange={(photo) => updateRunnerPhoto(r.id, photo)}
+                      size={36}
+                    />
                     <span style={{ flex: 1, fontSize: 16 }}>{r.name}</span>
                     <button
                       onClick={() => removeRunner(r.id)}
                       style={{
-                        background: 'none',
-                        border: '1px solid #333',
+                        background: "none",
+                        border: "1px solid #333",
                         borderRadius: 6,
-                        color: '#aa4444',
-                        padding: '4px 10px',
-                        cursor: 'pointer',
+                        color: "#aa4444",
+                        padding: "4px 10px",
+                        cursor: "pointer",
                         fontSize: 13,
                       }}
                     >
@@ -429,34 +424,34 @@ export function AdminView({ state, setState }: AdminViewProps) {
 
             {/* Start buttons */}
             {state.runners.length >= 2 && (
-              <div style={{ display: 'flex', gap: 12 }}>
+              <div style={{ display: "flex", gap: 12 }}>
                 <button
                   onClick={startRace}
                   style={{
                     flex: 1,
-                    background: 'linear-gradient(135deg, #00cc66, #00aa55)',
-                    color: '#000',
-                    border: 'none',
+                    background: "linear-gradient(135deg, #00cc66, #00aa55)",
+                    color: "#000",
+                    border: "none",
                     borderRadius: 12,
-                    padding: '16px',
-                    cursor: 'pointer',
+                    padding: "16px",
+                    cursor: "pointer",
                     fontSize: 20,
                     fontFamily: "'Bebas Neue', sans-serif",
                     letterSpacing: 3,
                   }}
                 >
-                  🏁 Départ à Midi
+                  🏁 Départ à 10h00
                 </button>
                 <button
                   onClick={startRaceNow}
                   style={{
                     flex: 1,
-                    background: 'linear-gradient(135deg, #4488ff, #2266dd)',
-                    color: '#fff',
-                    border: 'none',
+                    background: "linear-gradient(135deg, #4488ff, #2266dd)",
+                    color: "#fff",
+                    border: "none",
                     borderRadius: 12,
-                    padding: '16px',
-                    cursor: 'pointer',
+                    padding: "16px",
+                    cursor: "pointer",
                     fontSize: 20,
                     fontFamily: "'Bebas Neue', sans-serif",
                     letterSpacing: 3,
@@ -475,10 +470,10 @@ export function AdminView({ state, setState }: AdminViewProps) {
             <div
               style={{
                 fontSize: 14,
-                color: '#555',
+                color: "#555",
                 letterSpacing: 2,
                 marginBottom: 12,
-                textTransform: 'uppercase',
+                textTransform: "uppercase",
               }}
             >
               Gestion des coureurs — Boucle {currentLoop}
@@ -491,29 +486,29 @@ export function AdminView({ state, setState }: AdminViewProps) {
                 <div
                   key={r.id}
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
+                    display: "flex",
+                    alignItems: "center",
                     gap: 12,
-                    padding: '12px 16px',
+                    padding: "12px 16px",
                     borderRadius: 10,
                     marginBottom: 6,
                     background: hasFinishedThisLoop
-                      ? 'rgba(0,255,136,0.06)'
-                      : 'rgba(255,255,255,0.03)',
+                      ? "rgba(0,255,136,0.06)"
+                      : "rgba(255,255,255,0.03)",
                     border: hasFinishedThisLoop
-                      ? '1px solid rgba(0,255,136,0.2)'
-                      : '1px solid #1a1a2e',
+                      ? "1px solid rgba(0,255,136,0.2)"
+                      : "1px solid #1a1a2e",
                   }}
                 >
                   <div
                     style={{
                       width: 40,
                       height: 40,
-                      borderRadius: '50%',
-                      overflow: 'hidden',
-                      border: '2px solid #333',
+                      borderRadius: "50%",
+                      overflow: "hidden",
+                      border: "2px solid #333",
                       flexShrink: 0,
-                      background: '#1a1a2e',
+                      background: "#1a1a2e",
                     }}
                   >
                     {r.photo ? (
@@ -521,20 +516,20 @@ export function AdminView({ state, setState }: AdminViewProps) {
                         src={r.photo}
                         alt=""
                         style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover',
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
                         }}
                       />
                     ) : (
                       <div
                         style={{
-                          width: '100%',
-                          height: '100%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#555',
+                          width: "100%",
+                          height: "100%",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          color: "#555",
                           fontSize: 16,
                         }}
                       >
@@ -546,22 +541,22 @@ export function AdminView({ state, setState }: AdminViewProps) {
                     <div style={{ fontSize: 17, fontWeight: 500 }}>
                       {r.name}
                     </div>
-                    <div style={{ fontSize: 12, color: '#666' }}>
-                      {r.loops.length} boucle{r.loops.length !== 1 ? 's' : ''}
-                      {hasFinishedThisLoop && ' · ✅ Boucle validée'}
+                    <div style={{ fontSize: 12, color: "#666" }}>
+                      {r.loops.length} boucle{r.loops.length !== 1 ? "s" : ""}
+                      {hasFinishedThisLoop && " · ✅ Boucle validée"}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
+                  <div style={{ display: "flex", gap: 8 }}>
                     {!hasFinishedThisLoop && (
                       <button
                         onClick={() => recordArrival(r.id)}
                         style={{
-                          background: '#00cc66',
-                          color: '#000',
-                          border: 'none',
+                          background: "#00cc66",
+                          color: "#000",
+                          border: "none",
                           borderRadius: 8,
-                          padding: '8px 16px',
-                          cursor: 'pointer',
+                          padding: "8px 16px",
+                          cursor: "pointer",
                           fontSize: 14,
                           fontWeight: 600,
                         }}
@@ -570,28 +565,28 @@ export function AdminView({ state, setState }: AdminViewProps) {
                       </button>
                     )}
                     <button
-                      onClick={() => eliminateRunner(r.id, 'abandon')}
+                      onClick={() => eliminateRunner(r.id, "abandon")}
                       style={{
-                        background: 'none',
-                        border: '1px solid #442222',
+                        background: "none",
+                        border: "1px solid #442222",
                         borderRadius: 8,
-                        color: '#aa4444',
-                        padding: '8px 12px',
-                        cursor: 'pointer',
+                        color: "#aa4444",
+                        padding: "8px 12px",
+                        cursor: "pointer",
                         fontSize: 14,
                       }}
                     >
                       🏳️ Abandon
                     </button>
                     <button
-                      onClick={() => eliminateRunner(r.id, 'timeout')}
+                      onClick={() => eliminateRunner(r.id, "timeout")}
                       style={{
-                        background: '#331111',
-                        border: '1px solid #442222',
+                        background: "#331111",
+                        border: "1px solid #442222",
                         borderRadius: 8,
-                        color: '#cc4444',
-                        padding: '8px 12px',
-                        cursor: 'pointer',
+                        color: "#cc4444",
+                        padding: "8px 12px",
+                        cursor: "pointer",
                         fontSize: 14,
                       }}
                     >
@@ -603,16 +598,16 @@ export function AdminView({ state, setState }: AdminViewProps) {
             })}
 
             {activeRunners.length === 1 && (
-              <div style={{ marginTop: 20, textAlign: 'center' }}>
+              <div style={{ marginTop: 20, textAlign: "center" }}>
                 <button
                   onClick={() => declareWinner(activeRunners[0].id)}
                   style={{
-                    background: 'linear-gradient(135deg, gold, #cc9900)',
-                    color: '#000',
-                    border: 'none',
+                    background: "linear-gradient(135deg, gold, #cc9900)",
+                    color: "#000",
+                    border: "none",
                     borderRadius: 12,
-                    padding: '16px 40px',
-                    cursor: 'pointer',
+                    padding: "16px 40px",
+                    cursor: "pointer",
                     fontSize: 22,
                     fontFamily: "'Bebas Neue', sans-serif",
                     letterSpacing: 3,
@@ -629,30 +624,30 @@ export function AdminView({ state, setState }: AdminViewProps) {
                 <div
                   style={{
                     fontSize: 14,
-                    color: '#555',
+                    color: "#555",
                     letterSpacing: 2,
                     marginBottom: 12,
-                    textTransform: 'uppercase',
+                    textTransform: "uppercase",
                   }}
                 >
                   📊 Historique des boucles
                 </div>
                 <div
                   style={{
-                    background: 'rgba(255,255,255,0.02)',
+                    background: "rgba(255,255,255,0.02)",
                     borderRadius: 12,
-                    border: '1px solid #1a1a2e',
-                    overflow: 'hidden',
+                    border: "1px solid #1a1a2e",
+                    overflow: "hidden",
                   }}
                 >
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
                     <thead>
-                      <tr style={{ borderBottom: '1px solid #222' }}>
+                      <tr style={{ borderBottom: "1px solid #222" }}>
                         <th
                           style={{
-                            padding: '10px 14px',
-                            textAlign: 'left',
-                            color: '#555',
+                            padding: "10px 14px",
+                            textAlign: "left",
+                            color: "#555",
                             fontSize: 12,
                             letterSpacing: 1,
                           }}
@@ -661,9 +656,9 @@ export function AdminView({ state, setState }: AdminViewProps) {
                         </th>
                         <th
                           style={{
-                            padding: '10px 14px',
-                            textAlign: 'center',
-                            color: '#555',
+                            padding: "10px 14px",
+                            textAlign: "center",
+                            color: "#555",
                             fontSize: 12,
                             letterSpacing: 1,
                           }}
@@ -672,9 +667,9 @@ export function AdminView({ state, setState }: AdminViewProps) {
                         </th>
                         <th
                           style={{
-                            padding: '10px 14px',
-                            textAlign: 'right',
-                            color: '#555',
+                            padding: "10px 14px",
+                            textAlign: "right",
+                            color: "#555",
                             fontSize: 12,
                             letterSpacing: 1,
                           }}
@@ -690,47 +685,47 @@ export function AdminView({ state, setState }: AdminViewProps) {
                           <tr
                             key={r.id}
                             style={{
-                              borderBottom: '1px solid rgba(255,255,255,0.03)',
+                              borderBottom: "1px solid rgba(255,255,255,0.03)",
                             }}
                           >
                             <td
                               style={{
-                                padding: '10px 14px',
-                                display: 'flex',
-                                alignItems: 'center',
+                                padding: "10px 14px",
+                                display: "flex",
+                                alignItems: "center",
                                 gap: 8,
                               }}
                             >
                               <span
                                 style={{
                                   color:
-                                    r.status === 'dnf' ? '#664444' : '#eee',
+                                    r.status === "dnf" ? "#664444" : "#eee",
                                 }}
                               >
-                                {r.status === 'dnf' && '💀 '}
+                                {r.status === "dnf" && "💀 "}
                                 {r.name}
                               </span>
                             </td>
                             <td
                               style={{
-                                padding: '10px 14px',
-                                textAlign: 'center',
-                                color: '#888',
+                                padding: "10px 14px",
+                                textAlign: "center",
+                                color: "#888",
                               }}
                             >
                               {r.loops.length}
                             </td>
                             <td
                               style={{
-                                padding: '10px 14px',
-                                textAlign: 'right',
-                                color: '#666',
+                                padding: "10px 14px",
+                                textAlign: "right",
+                                color: "#666",
                                 fontSize: 13,
                               }}
                             >
                               {r.loops
                                 .map((l) => formatTime(l.timeMs))
-                                .join(' · ')}
+                                .join(" · ")}
                             </td>
                           </tr>
                         ))}
@@ -743,26 +738,25 @@ export function AdminView({ state, setState }: AdminViewProps) {
         )}
 
         {/* Soundboard */}
-        {state.raceStarted && (
-          <Soundboard onPlaySound={playSoundOnDashboard} />
-        )}
+        {state.raceStarted && <Soundboard onPlaySound={playSoundOnDashboard} />}
 
         {/* Instructions */}
         <div
           style={{
             marginTop: 30,
             padding: 16,
-            background: 'rgba(68,136,255,0.05)',
-            border: '1px solid rgba(68,136,255,0.1)',
+            background: "rgba(68,136,255,0.05)",
+            border: "1px solid rgba(68,136,255,0.1)",
             borderRadius: 10,
             fontSize: 13,
-            color: '#556',
+            color: "#556",
             lineHeight: 1.6,
           }}
         >
-          💡 <strong>Mode d&apos;emploi :</strong> Ouvre un 2e onglet avec{' '}
-          <code>/dashboard</code> dans l&apos;URL pour afficher le dashboard TV.
-          Cet onglet est l&apos;admin. Les deux se synchronisent automatiquement.
+          💡 <strong>Mode d&apos;emploi :</strong> Ouvre un 2e onglet avec{" "}
+          <code>/dashboard </code> dans l&apos;URL pour afficher le dashboard
+          TV. Cet onglet est l&apos;admin. Les deux se synchronisent
+          automatiquement.
         </div>
       </div>
 

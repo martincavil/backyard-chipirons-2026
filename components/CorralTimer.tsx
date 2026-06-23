@@ -1,7 +1,7 @@
 'use client';
 
 import { formatTime } from '@/lib/utils';
-import { LOOP_DISTANCE_KM } from '@/lib/constants';
+import { LOOP_DISTANCE_KM, LOOP_ELEVATION_M } from '@/lib/constants';
 
 interface CorralTimerProps {
   msRemaining: number;
@@ -65,7 +65,7 @@ export function CorralTimer({ msRemaining, currentLoop, preRace }: CorralTimerPr
             fontFamily: "'Oswald', sans-serif",
           }}
         >
-          {LOOP_DISTANCE_KM} km par boucle
+          {LOOP_DISTANCE_KM} km / {LOOP_ELEVATION_M}m D+ par boucle
         </div>
       )}
     </div>

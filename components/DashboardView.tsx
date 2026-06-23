@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { RaceState } from '@/types';
 import { computeLoopInfo } from '@/lib/utils';
 import { playDeathSound } from '@/lib/audio';
 import { LOOP_DISTANCE_KM } from '@/lib/constants';
 import { CorralTimer } from './CorralTimer';
 import { RunnerRow } from './RunnerRow';
-import { DeathBoard } from './DeathBoard';
+import { ParticipantWall } from './ParticipantWall';
 import { WastedOverlay } from './WastedOverlay';
 import WeatherWidget from './WeatherWidget';
 import { LiveStatsFooter } from './LiveStatsFooter';
@@ -21,9 +21,19 @@ interface DashboardViewProps {
 export function DashboardView({ state }: DashboardViewProps) {
   const [now, setNow] = useState(Date.now());
   const [wastedRunner, setWastedRunner] = useState<string | null>(null);
-  const lastEliminationRef = useRef<number | null>(null);
-  const lastSoundRef = useRef<number | null>(null);
-  const bossSoundPlayedRef = useRef(false);
+  // Initialized from the already-loaded state so a page refresh doesn't
+  // replay the overlay/sound for an elimination/sound that already happened.
+  const lastEliminationRef = useRef<number | null>(
+    state.lastElimination?._ts ?? null,
+  );
+  const lastSoundRef = useRef<number | null>(state.soundToPlay?._ts ?? null);
+  const bossSoundPlayedRef = useRef(
+    state.runners.filter((r) => r.status === 'active').length === 2,
+  );
+
+  // Stable identity so WastedOverlay's internal setTimeout isn't reset on
+  // every parent re-render (the dashboard re-renders every 200ms for the timer).
+  const dismissWastedOverlay = useCallback(() => setWastedRunner(null), []);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 200);
@@ -109,45 +119,31 @@ export function DashboardView({ state }: DashboardViewProps) {
         {wastedRunner && (
           <WastedOverlay
             name={wastedRunner}
-            onDone={() => setWastedRunner(null)}
+            onDone={dismissWastedOverlay}
           />
         )}
 
-        <DuelMode runners={activeRunners as [any, any]} currentLoop={currentLoop} />
+        <DuelMode
+          runners={activeRunners as [any, any]}
+          currentLoop={currentLoop}
+          msRemaining={msRemaining}
+          preRace={preRace}
+        />
 
-        {/* Timer overlay */}
-        {state.raceStarted && (
-          <div
-            style={{
-              position: 'fixed',
-              top: 20,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              zIndex: 100,
-            }}
-          >
-            <CorralTimer
-              currentLoop={currentLoop}
-              msRemaining={msRemaining}
-              preRace={preRace}
-            />
-          </div>
-        )}
-
-        {/* Mini death board at bottom */}
-        {eliminatedRunners.length > 0 && (
+        {/* Mini participant wall at bottom */}
+        {state.runners.length > 0 && (
           <div
             style={{
               position: 'fixed',
               bottom: 20,
               right: 20,
-              maxWidth: 400,
+              maxWidth: 500,
               zIndex: 100,
               transform: 'scale(0.7)',
               transformOrigin: 'bottom right',
             }}
           >
-            <DeathBoard eliminatedRunners={eliminatedRunners} />
+            <ParticipantWall runners={state.runners} />
           </div>
         )}
       </div>
@@ -235,15 +231,14 @@ export function DashboardView({ state }: DashboardViewProps) {
         minHeight: '100vh',
         background: 'radial-gradient(ellipse at top, #0d1b2a 0%, #050a14 60%)',
         color: '#fff',
-        padding: '20px 30px',
+        padding: '20px 30px 80px',
         position: 'relative',
-        overflow: 'hidden',
       }}
     >
       {wastedRunner && (
         <WastedOverlay
           name={wastedRunner}
-          onDone={() => setWastedRunner(null)}
+          onDone={dismissWastedOverlay}
         />
       )}
 
@@ -269,6 +264,17 @@ export function DashboardView({ state }: DashboardViewProps) {
             }}
           >
             🦑 Backyard Chipirons 2026
+          </div>
+          <div
+            style={{
+              fontFamily: "'Oswald', sans-serif",
+              fontSize: 13,
+              color: '#666',
+              letterSpacing: 1,
+              marginTop: 2,
+            }}
+          >
+            Samedi 4 juillet 2026 · Ville-d&apos;Avray
           </div>
         </div>
         <div
@@ -377,52 +383,37 @@ export function DashboardView({ state }: DashboardViewProps) {
         </div>
       )}
 
-      {/* Main content: runners + death board */}
-      <div style={{ display: 'flex', gap: 24, marginTop: 16 }}>
-        {/* Active runners */}
-        <div style={{ flex: 2 }}>
-          <div
-            style={{
-              fontFamily: "'Oswald', sans-serif",
-              fontSize: 14,
-              color: '#555',
-              letterSpacing: 3,
-              textTransform: 'uppercase',
-              marginBottom: 12,
-            }}
-          >
-            Coureurs en lice
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {sortedActive.map((r) => (
-              <RunnerRow
-                key={r.id}
-                runner={r}
-                fastestLoopRunnerId={fastestLoopRunnerId}
-                currentLoop={currentLoop}
-                lastArrival={state.lastArrival}
-                msRemaining={msRemaining}
-              />
-            ))}
-            {sortedActive.length === 0 && (
-              <div
-                style={{
-                  color: '#444',
-                  fontFamily: "'Oswald', sans-serif",
-                  padding: 20,
-                  textAlign: 'center',
-                }}
-              >
-                {state.raceStarted
-                  ? 'Plus aucun coureur en lice !'
-                  : 'Les coureurs apparaîtront ici'}
-              </div>
-            )}
-          </div>
-        </div>
+      {/* Participant wall — main focal point */}
+      <div style={{ marginTop: 24 }}>
+        <ParticipantWall runners={state.runners} size={100} />
+      </div>
 
-        {/* Death board */}
-        <DeathBoard eliminatedRunners={eliminatedRunners} />
+      {/* Active runners — secondary detail list */}
+      <div style={{ marginTop: 32, opacity: 0.7 }}>
+        <div
+          style={{
+            fontFamily: "'Oswald', sans-serif",
+            fontSize: 11,
+            color: '#555',
+            letterSpacing: 2,
+            textTransform: 'uppercase',
+            marginBottom: 8,
+          }}
+        >
+          Coureurs en lice
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {sortedActive.map((r) => (
+            <RunnerRow
+              key={r.id}
+              runner={r}
+              fastestLoopRunnerId={fastestLoopRunnerId}
+              currentLoop={currentLoop}
+              lastArrival={state.lastArrival}
+              msRemaining={msRemaining}
+            />
+          ))}
+        </div>
       </div>
 
       {/* Live stats footer */}
