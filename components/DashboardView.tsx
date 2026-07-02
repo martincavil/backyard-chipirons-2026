@@ -9,7 +9,6 @@ import { CorralTimer } from './CorralTimer';
 import { RunnerRow } from './RunnerRow';
 import { ParticipantWall } from './ParticipantWall';
 import { WastedOverlay } from './WastedOverlay';
-import WeatherWidget from './WeatherWidget';
 import { LiveStatsFooter } from './LiveStatsFooter';
 import { playSound } from '@/lib/sounds';
 import { DuelMode } from './DuelMode';
@@ -21,6 +20,7 @@ interface DashboardViewProps {
 export function DashboardView({ state }: DashboardViewProps) {
   const [now, setNow] = useState(Date.now());
   const [wastedRunner, setWastedRunner] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
   // Initialized from the already-loaded state so a page refresh doesn't
   // replay the overlay/sound for an elimination/sound that already happened.
   const lastEliminationRef = useRef<number | null>(
@@ -37,6 +37,13 @@ export function DashboardView({ state }: DashboardViewProps) {
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 200);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
   }, []);
 
   // Detect new elimination for sound + overlay
@@ -219,7 +226,7 @@ export function DashboardView({ state }: DashboardViewProps) {
         minHeight: '100vh',
         background: 'radial-gradient(ellipse at top, #0d1b2a 0%, #050a14 60%)',
         color: '#fff',
-        padding: '20px 30px 80px',
+        padding: isMobile ? '12px 12px 80px' : '20px 30px 80px',
         position: 'relative',
       }}
     >
@@ -234,8 +241,10 @@ export function DashboardView({ state }: DashboardViewProps) {
       <div
         style={{
           display: 'flex',
+          flexWrap: 'wrap',
           justifyContent: 'space-between',
           alignItems: 'center',
+          gap: 12,
           borderBottom: '1px solid rgba(255,255,255,0.08)',
           paddingBottom: 16,
           marginBottom: 8,
@@ -245,7 +254,7 @@ export function DashboardView({ state }: DashboardViewProps) {
           <div
             style={{
               fontFamily: "'Bebas Neue', sans-serif",
-              fontSize: 'clamp(28px, 4vw, 44px)',
+              fontSize: 'clamp(22px, 4vw, 44px)',
               letterSpacing: 4,
               color: '#fff',
               textShadow: '0 0 20px rgba(0,255,136,0.2)',
@@ -253,97 +262,69 @@ export function DashboardView({ state }: DashboardViewProps) {
           >
             🦑 Backyard Chipirons 2026
           </div>
-          <div
-            style={{
-              fontFamily: "'Oswald', sans-serif",
-              fontSize: 13,
-              color: '#666',
-              letterSpacing: 1,
-              marginTop: 2,
-            }}
-          >
-            Samedi 4 juillet 2026 · Ville-d&apos;Avray
-          </div>
+          {!isMobile && (
+            <div
+              style={{
+                fontFamily: "'Oswald', sans-serif",
+                fontSize: 13,
+                color: '#666',
+                letterSpacing: 1,
+                marginTop: 2,
+              }}
+            >
+              Samedi 4 juillet 2026 · Ville-d&apos;Avray
+            </div>
+          )}
         </div>
         <div
           style={{
             display: 'flex',
-            gap: 20,
-            alignItems: 'center',
+            gap: isMobile ? 16 : 30,
+            fontFamily: "'Oswald', sans-serif",
           }}
         >
-          <div
-            style={{
-              display: 'flex',
-              gap: 30,
-              fontFamily: "'Oswald', sans-serif",
-            }}
-          >
-            <div style={{ textAlign: 'center' }}>
-              <div
-                style={{
-                  fontSize: 36,
-                  color: '#00ff88',
-                  fontFamily: "'Bebas Neue', sans-serif",
-                }}
-              >
-                {activeRunners.length}
-              </div>
-              <div
-                style={{
-                  fontSize: 12,
-                  color: '#666',
-                  letterSpacing: 2,
-                  textTransform: 'uppercase',
-                }}
-              >
-                En course
-              </div>
+          <div style={{ textAlign: 'center' }}>
+            <div
+              style={{
+                fontSize: isMobile ? 28 : 36,
+                color: '#00ff88',
+                fontFamily: "'Bebas Neue', sans-serif",
+              }}
+            >
+              {activeRunners.length}
             </div>
-            <div style={{ textAlign: 'center' }}>
-              <div
-                style={{
-                  fontSize: 36,
-                  color: '#cc0000',
-                  fontFamily: "'Bebas Neue', sans-serif",
-                }}
-              >
-                {eliminatedRunners.length}
-              </div>
-              <div
-                style={{
-                  fontSize: 12,
-                  color: '#666',
-                  letterSpacing: 2,
-                  textTransform: 'uppercase',
-                }}
-              >
-                Éliminés
-              </div>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div
-                style={{
-                  fontSize: 36,
-                  color: '#4488ff',
-                  fontFamily: "'Bebas Neue', sans-serif",
-                }}
-              >
-                {currentLoop || '—'}
-              </div>
-              <div
-                style={{
-                  fontSize: 12,
-                  color: '#666',
-                  letterSpacing: 2,
-                  textTransform: 'uppercase',
-                }}
-              >
-                Boucle
-              </div>
+            <div style={{ fontSize: 11, color: '#666', letterSpacing: 2, textTransform: 'uppercase' }}>
+              En course
             </div>
           </div>
-          <WeatherWidget />
+          <div style={{ textAlign: 'center' }}>
+            <div
+              style={{
+                fontSize: isMobile ? 28 : 36,
+                color: '#cc0000',
+                fontFamily: "'Bebas Neue', sans-serif",
+              }}
+            >
+              {eliminatedRunners.length}
+            </div>
+            <div style={{ fontSize: 11, color: '#666', letterSpacing: 2, textTransform: 'uppercase' }}>
+              Éliminés
+            </div>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div
+              style={{
+                fontSize: isMobile ? 28 : 36,
+                color: '#4488ff',
+                fontFamily: "'Bebas Neue', sans-serif",
+              }}
+            >
+              {currentLoop || '—'}
+            </div>
+            <div style={{ fontSize: 11, color: '#666', letterSpacing: 2, textTransform: 'uppercase' }}>
+              Boucle
+            </div>
+          </div>
         </div>
       </div>
 

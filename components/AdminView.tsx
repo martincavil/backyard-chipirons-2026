@@ -24,6 +24,9 @@ export function AdminView({ state, setState, supabaseStatus }: AdminViewProps) {
   const [newName, setNewName] = useState("");
   const [newPhoto, setNewPhoto] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
+  const [isMobile, setIsMobile] = useState(false);
+  const [modalRunnerId, setModalRunnerId] = useState<string | null>(null);
+  const [resetStep, setResetStep] = useState(0);
 
   const { undoActions, addUndoAction, undoAction, dismissAction } =
     useUndoAction(state, setState);
@@ -31,6 +34,13 @@ export function AdminView({ state, setState, supabaseStatus }: AdminViewProps) {
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
   }, []);
 
   const { currentLoop, msRemaining, preRace } = computeLoopInfo(
@@ -183,15 +193,21 @@ export function AdminView({ state, setState, supabaseStatus }: AdminViewProps) {
     addUndoAction(`${winnerName} déclaré(e) vainqueur`, previousState);
   };
 
-  const resetRace = () => {
-    if (
-      window.confirm(
-        "⚠️ Remettre à zéro toute la course ? Cette action est irréversible.",
-      )
-    ) {
-      const fresh = { ...DEFAULT_STATE };
-      setState(fresh);
-    }
+  const resetRace = () => setResetStep(1);
+
+  const reinstateRunner = (runnerId: string) => {
+    const runner = state.runners.find((r) => r.id === runnerId);
+    if (!runner) return;
+    const previousState = { ...state };
+    setState({
+      ...state,
+      runners: state.runners.map((r) =>
+        r.id === runnerId
+          ? { ...r, status: "active" as const, eliminatedAt: null }
+          : r,
+      ),
+    });
+    addUndoAction(`${runner.name} réintégré(e) dans la course`, previousState);
   };
 
   // Resets the race to pre-start state but keeps all runners (useful for testing)
@@ -576,6 +592,7 @@ export function AdminView({ state, setState, supabaseStatus }: AdminViewProps) {
               return (
                 <div
                   key={r.id}
+                  onClick={() => isMobile && setModalRunnerId(r.id)}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -589,6 +606,7 @@ export function AdminView({ state, setState, supabaseStatus }: AdminViewProps) {
                     border: hasFinishedThisLoop
                       ? "1px solid rgba(0,255,136,0.2)"
                       : "1px solid #1a1a2e",
+                    cursor: isMobile ? "pointer" : "default",
                   }}
                 >
                   <div
@@ -606,11 +624,7 @@ export function AdminView({ state, setState, supabaseStatus }: AdminViewProps) {
                       <img
                         src={r.photo}
                         alt=""
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "cover",
-                        }}
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
                       />
                     ) : (
                       <div
@@ -629,61 +643,66 @@ export function AdminView({ state, setState, supabaseStatus }: AdminViewProps) {
                     )}
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 17, fontWeight: 500 }}>
-                      {r.name}
-                    </div>
+                    <div style={{ fontSize: 17, fontWeight: 500 }}>{r.name}</div>
                     <div style={{ fontSize: 12, color: "#666" }}>
                       {r.loops.length} boucle{r.loops.length !== 1 ? "s" : ""}
                       {hasFinishedThisLoop && " · ✅ Boucle validée"}
                     </div>
                   </div>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    {!hasFinishedThisLoop && (
+                  {/* Desktop: inline buttons */}
+                  {!isMobile && (
+                    <div style={{ display: "flex", gap: 8 }}>
+                      {!hasFinishedThisLoop && (
+                        <button
+                          onClick={() => recordArrival(r.id)}
+                          style={{
+                            background: "#00cc66",
+                            color: "#000",
+                            border: "none",
+                            borderRadius: 8,
+                            padding: "8px 16px",
+                            cursor: "pointer",
+                            fontSize: 14,
+                            fontWeight: 600,
+                          }}
+                        >
+                          ✅ Arrivée
+                        </button>
+                      )}
                       <button
-                        onClick={() => recordArrival(r.id)}
+                        onClick={() => eliminateRunner(r.id, "abandon")}
                         style={{
-                          background: "#00cc66",
-                          color: "#000",
-                          border: "none",
+                          background: "none",
+                          border: "1px solid #442222",
                           borderRadius: 8,
-                          padding: "8px 16px",
+                          color: "#aa4444",
+                          padding: "8px 12px",
                           cursor: "pointer",
                           fontSize: 14,
-                          fontWeight: 600,
                         }}
                       >
-                        ✅ Arrivée
+                        🏳️ Abandon
                       </button>
-                    )}
-                    <button
-                      onClick={() => eliminateRunner(r.id, "abandon")}
-                      style={{
-                        background: "none",
-                        border: "1px solid #442222",
-                        borderRadius: 8,
-                        color: "#aa4444",
-                        padding: "8px 12px",
-                        cursor: "pointer",
-                        fontSize: 14,
-                      }}
-                    >
-                      🏳️ Abandon
-                    </button>
-                    <button
-                      onClick={() => eliminateRunner(r.id, "timeout")}
-                      style={{
-                        background: "#331111",
-                        border: "1px solid #442222",
-                        borderRadius: 8,
-                        color: "#cc4444",
-                        padding: "8px 12px",
-                        cursor: "pointer",
-                        fontSize: 14,
-                      }}
-                    >
-                      ⏰ Hors délai
-                    </button>
-                  </div>
+                      <button
+                        onClick={() => eliminateRunner(r.id, "timeout")}
+                        style={{
+                          background: "#331111",
+                          border: "1px solid #442222",
+                          borderRadius: 8,
+                          color: "#cc4444",
+                          padding: "8px 12px",
+                          cursor: "pointer",
+                          fontSize: 14,
+                        }}
+                      >
+                        ⏰ Hors délai
+                      </button>
+                    </div>
+                  )}
+                  {/* Mobile: tap hint */}
+                  {isMobile && (
+                    <div style={{ fontSize: 20, color: "#333" }}>›</div>
+                  )}
                 </div>
               );
             })}
@@ -706,6 +725,59 @@ export function AdminView({ state, setState, supabaseStatus }: AdminViewProps) {
                 >
                   🏆 Déclarer {activeRunners[0].name} Vainqueur
                 </button>
+              </div>
+            )}
+
+            {/* Eliminated runners — with reinstate option */}
+            {eliminatedRunners.length > 0 && (
+              <div style={{ marginTop: 24 }}>
+                <div
+                  style={{
+                    fontSize: 13,
+                    color: "#555",
+                    letterSpacing: 2,
+                    marginBottom: 8,
+                    textTransform: "uppercase",
+                  }}
+                >
+                  🏳️ Éliminés ({eliminatedRunners.length})
+                </div>
+                {eliminatedRunners.map((r) => (
+                  <div
+                    key={r.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      padding: "8px 12px",
+                      borderRadius: 8,
+                      marginBottom: 4,
+                      background: "rgba(255,0,0,0.04)",
+                      border: "1px solid #331111",
+                    }}
+                  >
+                    <span style={{ flex: 1, fontSize: 15, color: "#664444" }}>
+                      💀 {r.name}
+                      <span style={{ fontSize: 12, color: "#444", marginLeft: 8 }}>
+                        {r.eliminatedAt?.reason === "abandon" ? "abandon" : "hors délai"} · boucle {r.eliminatedAt?.loop}
+                      </span>
+                    </span>
+                    <button
+                      onClick={() => reinstateRunner(r.id)}
+                      style={{
+                        background: "none",
+                        border: "1px solid #224422",
+                        borderRadius: 6,
+                        color: "#44aa44",
+                        padding: "4px 12px",
+                        cursor: "pointer",
+                        fontSize: 13,
+                      }}
+                    >
+                      ↩ Réintégrer
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
 
@@ -853,6 +925,227 @@ export function AdminView({ state, setState, supabaseStatus }: AdminViewProps) {
         onUndo={undoAction}
         onDismiss={dismissAction}
       />
+
+      {/* Reset tout — triple confirmation modal */}
+      {resetStep > 0 && (
+        <div
+          onClick={() => setResetStep(0)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.85)",
+            zIndex: 2000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#1a0808",
+              border: "1px solid #551111",
+              borderRadius: 16,
+              padding: "28px 24px",
+              width: "100%",
+              maxWidth: 400,
+              textAlign: "center",
+            }}
+          >
+            {resetStep === 1 && (
+              <>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>⚠️</div>
+                <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>Reset total</div>
+                <div style={{ fontSize: 14, color: "#888", marginBottom: 24 }}>
+                  Tout sera effacé : coureurs, boucles, photos. Cette action est irréversible.
+                </div>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button onClick={() => setResetStep(0)} style={{ flex: 1, background: "none", border: "1px solid #333", borderRadius: 10, padding: "12px", color: "#888", cursor: "pointer", fontSize: 15 }}>
+                    Annuler
+                  </button>
+                  <button onClick={() => setResetStep(2)} style={{ flex: 1, background: "#cc2222", border: "none", borderRadius: 10, padding: "12px", color: "#fff", cursor: "pointer", fontSize: 15, fontWeight: 600 }}>
+                    Continuer →
+                  </button>
+                </div>
+              </>
+            )}
+            {resetStep === 2 && (
+              <>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>🗑️</div>
+                <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>Tu es sûr ?</div>
+                <div style={{ fontSize: 14, color: "#888", marginBottom: 24 }}>
+                  {state.runners.length} coureur{state.runners.length !== 1 ? "s" : ""} et toutes les données de course seront perdus.
+                </div>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button onClick={() => setResetStep(0)} style={{ flex: 1, background: "none", border: "1px solid #333", borderRadius: 10, padding: "12px", color: "#888", cursor: "pointer", fontSize: 15 }}>
+                    Annuler
+                  </button>
+                  <button onClick={() => setResetStep(3)} style={{ flex: 1, background: "#cc2222", border: "none", borderRadius: 10, padding: "12px", color: "#fff", cursor: "pointer", fontSize: 15, fontWeight: 600 }}>
+                    Oui, effacer →
+                  </button>
+                </div>
+              </>
+            )}
+            {resetStep === 3 && (
+              <>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>💀</div>
+                <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>Dernière chance</div>
+                <div style={{ fontSize: 14, color: "#cc4444", marginBottom: 24 }}>
+                  Après ça, il n'y a pas de retour en arrière. Vraiment.
+                </div>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button onClick={() => setResetStep(0)} style={{ flex: 1, background: "none", border: "1px solid #333", borderRadius: 10, padding: "12px", color: "#888", cursor: "pointer", fontSize: 15 }}>
+                    Annuler
+                  </button>
+                  <button
+                    onClick={() => { setState({ ...DEFAULT_STATE }); setResetStep(0); }}
+                    style={{ flex: 1, background: "#881111", border: "1px solid #cc2222", borderRadius: 10, padding: "12px", color: "#ff6666", cursor: "pointer", fontSize: 15, fontWeight: 700 }}
+                  >
+                    RESET DÉFINITIF
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Mobile runner action modal */}
+      {modalRunnerId && (() => {
+        const r = state.runners.find((x) => x.id === modalRunnerId);
+        if (!r) return null;
+        const hasFinishedThisLoop = r.loops.some((l) => l.loop === currentLoop);
+        return (
+          <div
+            onClick={() => setModalRunnerId(null)}
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,0.75)",
+              zIndex: 1000,
+              display: "flex",
+              alignItems: "flex-end",
+              justifyContent: "center",
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: "#151525",
+                borderRadius: "20px 20px 0 0",
+                padding: "24px 20px 40px",
+                width: "100%",
+                maxWidth: 480,
+                border: "1px solid #222",
+              }}
+            >
+              {/* Runner identity */}
+              <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 24 }}>
+                <div
+                  style={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: "50%",
+                    overflow: "hidden",
+                    border: "2px solid #333",
+                    background: "#1a1a2e",
+                    flexShrink: 0,
+                  }}
+                >
+                  {r.photo ? (
+                    <img src={r.photo} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  ) : (
+                    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>🏃</div>
+                  )}
+                </div>
+                <div>
+                  <div style={{ fontSize: 20, fontWeight: 600 }}>{r.name}</div>
+                  <div style={{ fontSize: 13, color: "#666" }}>
+                    {r.loops.length} boucle{r.loops.length !== 1 ? "s" : ""}
+                    {hasFinishedThisLoop && " · ✅ Boucle {currentLoop} validée"}
+                  </div>
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {!hasFinishedThisLoop && (
+                  <button
+                    onClick={() => { recordArrival(r.id); setModalRunnerId(null); }}
+                    style={{
+                      background: "#00cc66",
+                      color: "#000",
+                      border: "none",
+                      borderRadius: 12,
+                      padding: "16px",
+                      cursor: "pointer",
+                      fontSize: 18,
+                      fontWeight: 700,
+                      fontFamily: "'Oswald', sans-serif",
+                      letterSpacing: 1,
+                    }}
+                  >
+                    ✅ Arrivée boucle {currentLoop}
+                  </button>
+                )}
+                {hasFinishedThisLoop && (
+                  <div style={{ textAlign: "center", color: "#00ff88", fontSize: 15, padding: "12px 0" }}>
+                    ✅ Boucle {currentLoop} déjà validée
+                  </div>
+                )}
+                <button
+                  onClick={() => { eliminateRunner(r.id, "abandon"); setModalRunnerId(null); }}
+                  style={{
+                    background: "rgba(170,68,68,0.15)",
+                    color: "#cc6666",
+                    border: "1px solid #442222",
+                    borderRadius: 12,
+                    padding: "14px",
+                    cursor: "pointer",
+                    fontSize: 16,
+                    fontFamily: "'Oswald', sans-serif",
+                    letterSpacing: 1,
+                  }}
+                >
+                  🏳️ Abandon
+                </button>
+                <button
+                  onClick={() => { eliminateRunner(r.id, "timeout"); setModalRunnerId(null); }}
+                  style={{
+                    background: "rgba(200,50,50,0.15)",
+                    color: "#cc4444",
+                    border: "1px solid #551111",
+                    borderRadius: 12,
+                    padding: "14px",
+                    cursor: "pointer",
+                    fontSize: 16,
+                    fontFamily: "'Oswald', sans-serif",
+                    letterSpacing: 1,
+                  }}
+                >
+                  ⏰ Hors délai
+                </button>
+                <button
+                  onClick={() => setModalRunnerId(null)}
+                  style={{
+                    background: "none",
+                    color: "#555",
+                    border: "1px solid #222",
+                    borderRadius: 12,
+                    padding: "12px",
+                    cursor: "pointer",
+                    fontSize: 15,
+                    marginTop: 4,
+                  }}
+                >
+                  Annuler
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
