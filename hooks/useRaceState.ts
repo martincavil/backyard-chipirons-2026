@@ -6,9 +6,14 @@ import { DEFAULT_STATE, SYNC_KEY } from '@/lib/constants';
 import { loadState, loadFromStorage, saveState, persistToStorage } from '@/lib/storage';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
+export type SupabaseStatus = 'loading' | 'connected' | 'error' | 'not-configured';
+
 export function useRaceState() {
   const [state, setState] = useState<RaceState>(DEFAULT_STATE);
   const [loaded, setLoaded] = useState(false);
+  const [supabaseStatus, setSupabaseStatus] = useState<SupabaseStatus>(
+    isSupabaseConfigured ? 'loading' : 'not-configured',
+  );
   const raceIdRef = useRef<string | null>(null);
   const isUpdatingRef = useRef(false);
 
@@ -27,6 +32,7 @@ export function useRaceState() {
 
           if (error) {
             console.error('Error loading from Supabase:', error);
+            setSupabaseStatus('error');
             // Fallback to localStorage
             const saved = loadState();
             if (saved && saved.runners) {
@@ -35,11 +41,13 @@ export function useRaceState() {
           } else if (data) {
             raceIdRef.current = data.id;
             setState(data.state as RaceState);
+            setSupabaseStatus('connected');
             // Also save to localStorage as backup
             saveState(data.state as RaceState);
           }
         } catch (err) {
           console.error('Supabase error:', err);
+          setSupabaseStatus('error');
           // Fallback to localStorage
           const saved = loadState();
           if (saved && saved.runners) {
@@ -132,25 +140,24 @@ export function useRaceState() {
 
         if (error) {
           console.error('Error updating Supabase:', error);
-          // Fallback to localStorage
+          setSupabaseStatus('error');
           saveState(newState);
           persistToStorage(newState);
         } else {
-          // Also save to localStorage as backup
+          setSupabaseStatus('connected');
           saveState(newState);
         }
       } catch (err) {
         console.error('Supabase update error:', err);
-        // Fallback to localStorage
+        setSupabaseStatus('error');
         saveState(newState);
         persistToStorage(newState);
       }
     } else {
-      // Use localStorage (existing behavior)
       saveState(newState);
       persistToStorage(newState);
     }
   };
 
-  return { state, setState: updateState, loaded };
+  return { state, setState: updateState, loaded, supabaseStatus };
 }

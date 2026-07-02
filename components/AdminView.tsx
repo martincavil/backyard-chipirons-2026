@@ -14,13 +14,15 @@ import { useUndoAction } from "@/hooks/useUndoAction";
 import { UndoToast } from "./UndoToast";
 import { Soundboard } from "./Soundboard";
 import { SoundType } from "@/lib/sounds";
+import { SupabaseStatus } from "@/hooks/useRaceState";
 
 interface AdminViewProps {
   state: RaceState;
   setState: (state: RaceState) => void;
+  supabaseStatus: SupabaseStatus;
 }
 
-export function AdminView({ state, setState }: AdminViewProps) {
+export function AdminView({ state, setState, supabaseStatus }: AdminViewProps) {
   const [newName, setNewName] = useState("");
   const [newPhoto, setNewPhoto] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
@@ -194,6 +196,25 @@ export function AdminView({ state, setState }: AdminViewProps) {
     }
   };
 
+  // Resets the race to pre-start state but keeps all runners (useful for testing)
+  const resetRaceKeepRunners = () => {
+    if (
+      window.confirm(
+        "Remettre la course à zéro en gardant les coureurs inscrits ?",
+      )
+    ) {
+      setState({
+        ...DEFAULT_STATE,
+        runners: state.runners.map((r) => ({
+          ...r,
+          status: "active" as const,
+          loops: [],
+          eliminatedAt: null,
+        })),
+      });
+    }
+  };
+
   const playSoundOnDashboard = (sound: SoundType) => {
     setState({
       ...state,
@@ -243,11 +264,82 @@ export function AdminView({ state, setState }: AdminViewProps) {
               Heure Paris : {parisTimeStr}
             </div>
           </div>
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+            {/* Supabase connection badge */}
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 12,
+                padding: "4px 10px",
+                borderRadius: 20,
+                background:
+                  supabaseStatus === "connected"
+                    ? "rgba(0,255,136,0.08)"
+                    : supabaseStatus === "error"
+                      ? "rgba(255,68,68,0.1)"
+                      : supabaseStatus === "loading"
+                        ? "rgba(255,255,255,0.04)"
+                        : "rgba(255,255,255,0.04)",
+                border:
+                  supabaseStatus === "connected"
+                    ? "1px solid rgba(0,255,136,0.25)"
+                    : supabaseStatus === "error"
+                      ? "1px solid rgba(255,68,68,0.3)"
+                      : "1px solid #222",
+                color:
+                  supabaseStatus === "connected"
+                    ? "#00ff88"
+                    : supabaseStatus === "error"
+                      ? "#ff6666"
+                      : "#666",
+              }}
+            >
+              <span
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: "50%",
+                  background:
+                    supabaseStatus === "connected"
+                      ? "#00ff88"
+                      : supabaseStatus === "error"
+                        ? "#ff4444"
+                        : supabaseStatus === "loading"
+                          ? "#888"
+                          : "#444",
+                  flexShrink: 0,
+                }}
+              />
+              {supabaseStatus === "connected"
+                ? "Supabase OK"
+                : supabaseStatus === "error"
+                  ? "Supabase HS"
+                  : supabaseStatus === "loading"
+                    ? "Connexion…"
+                    : "Local only"}
+            </span>
             <span style={{ fontSize: 14, color: "#555" }}>
               {activeRunners.length} en course · {eliminatedRunners.length}{" "}
               éliminés
             </span>
+            {state.raceStarted && (
+              <button
+                onClick={resetRaceKeepRunners}
+                style={{
+                  background: "#112233",
+                  color: "#4488cc",
+                  border: "1px solid #224466",
+                  borderRadius: 6,
+                  padding: "6px 12px",
+                  cursor: "pointer",
+                  fontSize: 13,
+                }}
+              >
+                Reset course
+              </button>
+            )}
             <button
               onClick={resetRace}
               style={{
@@ -260,7 +352,7 @@ export function AdminView({ state, setState }: AdminViewProps) {
                 fontSize: 13,
               }}
             >
-              Reset
+              Reset tout
             </button>
           </div>
         </div>
