@@ -33,11 +33,6 @@ export interface LastArrival {
   _ts: number;
 }
 
-export interface SoundToPlay {
-  sound: 'horn' | 'applause' | 'boss' | 'victory';
-  _ts: number;
-}
-
 export interface RaceState {
   raceStartTime: string | null; // ISO string of race start (noon Paris)
   raceStarted: boolean;
@@ -45,7 +40,6 @@ export interface RaceState {
   runners: Runner[];
   lastElimination: LastElimination | null;
   lastArrival: LastArrival | null;
-  soundToPlay: SoundToPlay | null;
 }
 
 export interface LoopInfo {

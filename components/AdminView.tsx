@@ -12,8 +12,6 @@ import {
 import { PhotoUpload } from "./PhotoUpload";
 import { useUndoAction } from "@/hooks/useUndoAction";
 import { UndoToast } from "./UndoToast";
-import { Soundboard } from "./Soundboard";
-import { SoundType } from "@/lib/sounds";
 import { SupabaseStatus } from "@/hooks/useRaceState";
 
 interface AdminViewProps {
@@ -213,13 +211,6 @@ export function AdminView({ state, setState, supabaseStatus }: AdminViewProps) {
         })),
       });
     }
-  };
-
-  const playSoundOnDashboard = (sound: SoundType) => {
-    setState({
-      ...state,
-      soundToPlay: { sound, _ts: Date.now() },
-    });
   };
 
   const parisTimeStr = getParisNow().toLocaleTimeString("fr-FR", {
@@ -828,9 +819,6 @@ export function AdminView({ state, setState, supabaseStatus }: AdminViewProps) {
             )}
           </div>
         )}
-
-        {/* Soundboard */}
-        {state.raceStarted && <Soundboard onPlaySound={playSoundOnDashboard} />}
 
         {/* Instructions */}
         <div

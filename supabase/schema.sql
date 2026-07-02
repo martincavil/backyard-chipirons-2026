@@ -33,6 +33,9 @@ CREATE TRIGGER update_races_updated_at
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
 
+-- Enable Realtime for this table (required for postgres_changes subscriptions)
+ALTER PUBLICATION supabase_realtime ADD TABLE races;
+
 -- Insert a default race if none exists
 INSERT INTO races (state)
 SELECT '{

@@ -24,5 +24,4 @@ export const DEFAULT_STATE: RaceState = {
   runners: [],
   lastElimination: null,
   lastArrival: null,
-  soundToPlay: null,
 };

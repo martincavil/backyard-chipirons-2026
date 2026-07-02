@@ -26,7 +26,6 @@ export function DashboardView({ state }: DashboardViewProps) {
   const lastEliminationRef = useRef<number | null>(
     state.lastElimination?._ts ?? null,
   );
-  const lastSoundRef = useRef<number | null>(state.soundToPlay?._ts ?? null);
   const bossSoundPlayedRef = useRef(
     state.runners.filter((r) => r.status === 'active').length === 2,
   );
@@ -51,17 +50,6 @@ export function DashboardView({ state }: DashboardViewProps) {
       playDeathSound();
     }
   }, [state.lastElimination]);
-
-  // Detect soundboard triggers and play sounds
-  useEffect(() => {
-    if (
-      state.soundToPlay &&
-      state.soundToPlay._ts !== lastSoundRef.current
-    ) {
-      lastSoundRef.current = state.soundToPlay._ts;
-      playSound(state.soundToPlay.sound);
-    }
-  }, [state.soundToPlay]);
 
   const { currentLoop, msRemaining, preRace } = computeLoopInfo(
     state.raceStartTime,
