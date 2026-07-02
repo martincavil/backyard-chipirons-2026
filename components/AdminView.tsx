@@ -255,7 +255,15 @@ export function AdminView({ state, setState, supabaseStatus }: AdminViewProps) {
               Heure Paris : {parisTimeStr}
             </div>
           </div>
-          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              alignItems: "center",
+              flexWrap: "wrap",
+              justifyContent: "flex-end",
+            }}
+          >
             {/* Supabase connection badge */}
             <span
               style={{
@@ -834,9 +842,8 @@ export function AdminView({ state, setState, supabaseStatus }: AdminViewProps) {
           }}
         >
           💡 <strong>Mode d&apos;emploi :</strong> Ouvre un 2e onglet avec{" "}
-          <code>/dashboard </code> dans l&apos;URL pour afficher le dashboard
-          TV. Cet onglet est l&apos;admin. Les deux se synchronisent
-          automatiquement.
+          <code>/ </code> dans l&apos;URL pour afficher le dashboard TV. Cet
+          onglet est l&apos;admin. Les deux se synchronisent automatiquement.
         </div>
       </div>
 
