@@ -8,9 +8,10 @@ import { LOOP_DISTANCE_KM } from '@/lib/constants';
 interface LiveStatsFooterProps {
   state: RaceState;
   raceElapsedMs: number;
+  inline?: boolean;
 }
 
-export function LiveStatsFooter({ state, raceElapsedMs }: LiveStatsFooterProps) {
+export function LiveStatsFooter({ state, raceElapsedMs, inline }: LiveStatsFooterProps) {
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 640);
@@ -46,11 +47,16 @@ export function LiveStatsFooter({ state, raceElapsedMs }: LiveStatsFooterProps) 
   return (
     <div
       style={{
-        position: 'fixed',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        padding: isMobile ? '8px 12px' : '12px 30px',
+        ...(inline
+          ? { position: 'relative' as const }
+          : {
+              position: 'fixed' as const,
+              bottom: 0,
+              left: 0,
+              right: 0,
+              zIndex: 100,
+            }),
+        padding: isMobile ? '8px 12px' : inline ? '14px 30px' : '12px 30px',
         backgroundColor: 'rgba(10, 10, 20, 0.9)',
         backdropFilter: 'blur(8px)',
         borderTop: '1px solid rgba(255, 255, 255, 0.1)',
@@ -58,9 +64,8 @@ export function LiveStatsFooter({ state, raceElapsedMs }: LiveStatsFooterProps) 
         justifyContent: 'space-around',
         alignItems: 'center',
         fontFamily: "'Oswald', sans-serif",
-        fontSize: isMobile ? 12 : 14,
+        fontSize: isMobile ? 12 : inline ? 18 : 14,
         color: '#aaa',
-        zIndex: 100,
       }}
     >
       {/* Total distance */}

@@ -73,3 +73,13 @@ body {
     opacity: 1;
   }
 }
+
+/* Captain Morgan bottles raining down on the winner screen */
+@keyframes captainFall {
+  from {
+    transform: translateY(-20vh) rotate(0deg);
+  }
+  to {
+    transform: translateY(120vh) rotate(var(--spin, 720deg));
+  }
+}
